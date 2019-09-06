@@ -54,7 +54,7 @@ klee::ExecutionState &CustomSearcher::selectState() {
 		for(int i=0 ; i<fringe.size(); i++){
 			S2EExecutionState* tmp_ris =fringe.at(i); 
 			getInfoStream(tmp_ris) <<
-			"[sunghyun] state ID : " <<tmp_ris->getID()  <<
+			"[sunghyun_new] state ID : " <<tmp_ris->getID()  <<
 			" at pc = " << hexval(tmp_ris->regs()->getPc()) <<  "\n";
 
 		}
