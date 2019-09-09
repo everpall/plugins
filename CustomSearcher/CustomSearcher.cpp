@@ -57,15 +57,6 @@ klee::ExecutionState &CustomSearcher::selectState() {
 			getInfoStream(tmp_ris) <<
 			"[Ready - State] state ID : " <<tmp_ris->getID()  <<
 			" at pc = " << hexval(tmp_ris->regs()->getPc()) <<  "\n";
-
-            if(tmp_ris->regs()->getPc() == 0x401687){
-                getInfoStream(tmp_ris) <<
-                "   [Here selected] state ID : " <<tmp_ris->getID()  <<
-                " at pc = " << hexval(tmp_ris->regs()->getPc()) <<  
-                " Pick! "<< "\n\n";
-                fringe.erase(fringe.begin()+i);
-                fringe.push_back(tmp_ris);
-            }
 		}
     }
     return *ris;
@@ -87,11 +78,12 @@ void CustomSearcher::update(klee::ExecutionState *current, const klee::StateSet 
     foreach2 (it, addedStates.begin(), addedStates.end()) {
         S2EExecutionState *state = static_cast<S2EExecutionState *>(*it);
         fringe.push_back(state);
+        uint64_t staticTargets[1];
 
         if (debug) {
             getInfoStream(s2eCurrent) <<
-                 "Adding state ID: " << state->getID() <<
-                 " GID: " << state->getGuid() << "\n";
+                "Adding state ID: " << state->getID() <<
+                " Dest branch:" << hexval(state->getStaticTarget(&staticTargets[0])) << "\n";
         }
     }
 
