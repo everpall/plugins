@@ -79,7 +79,7 @@ void CustomSearcher::update(klee::ExecutionState *current, const klee::StateSet 
         S2EExecutionState *state = static_cast<S2EExecutionState *>(*it);
         fringe.push_back(state);
         uint64_t staticTargets[1];
-        state->getStaticTarget(&staticTargets[0])
+        state->getStaticTarget(&staticTargets[0]);
 
         if (debug) {
             getInfoStream(s2eCurrent) <<
