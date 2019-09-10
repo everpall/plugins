@@ -32,8 +32,10 @@ public:
     virtual bool empty();
 
 private:
-    std::vector<S2EExecutionState*> fringe;
+    std::vector<S2EExecutionState*> state_group1;
+    std::vector<S2EExecutionState*> state_group2;
     bool debug;
+    uint64_t m_address;
 };
 
 } // namespace plugins

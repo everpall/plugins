@@ -38,12 +38,19 @@ S2E_DEFINE_PLUGIN(CustomSearcher, "Custom searcher", "CustomSearcher");
 
 void CustomSearcher::initialize() {
     s2e()->getExecutor()->setSearcher(this);
+    m_address = (uint64_t) s2e()->getConfig()->getInt(getConfigKey() + ".addressToTrack");
     debug = true;// s2e()->getConfig()->getBool(getConfigKey() + ".debug");
 }
 
 klee::ExecutionState &CustomSearcher::selectState() {
-    S2EExecutionState* ris = fringe.back();
-    
+    S2EExecutionState* ris = NULL;
+    if(!state_group1.empty()){
+        ris = state_group1.back();
+    }
+    else{
+        ris = state_group2.back();
+    }
+
     if (debug) {
         uint64_t ip = 0x0;
         if (ris->regs())
@@ -52,12 +59,18 @@ klee::ExecutionState &CustomSearcher::selectState() {
             "Selecting state ID: " << ris->getID() <<
             " GID: " << ris->getGuid() <<
             " IP: " << ip << "\n";
-		for(int i=0 ; i<fringe.size(); i++){
-			S2EExecutionState* tmp_ris =fringe.at(i); 
-			getInfoStream(tmp_ris) <<
-			"[Ready - State] state ID : " <<tmp_ris->getID()  <<
-			" at pc = " << hexval(tmp_ris->regs()->getPc()) <<  "\n";
-		}
+        for(int i=0 ; i<state_group1.size(); i++){
+            S2EExecutionState* tmp_ris =state_group1.at(i); 
+            getInfoStream(tmp_ris) <<
+            "[Ready - state_group1] state ID : " <<tmp_ris->getID()  <<
+            " at pc = " << hexval(tmp_ris->regs()->getPc()) <<  "\n";
+        }
+        for(int i=0 ; i<state_group2.size(); i++){
+            S2EExecutionState* tmp_ris =state_group2.at(i); 
+            getInfoStream(tmp_ris) <<
+            "[Ready - state_group2] state ID : " <<tmp_ris->getID()  <<
+            " at pc = " << hexval(tmp_ris->regs()->getPc()) <<  "\n";
+        }
     }
     return *ris;
 }
@@ -77,24 +90,41 @@ void CustomSearcher::update(klee::ExecutionState *current, const klee::StateSet 
 
     foreach2 (it, addedStates.begin(), addedStates.end()) {
         S2EExecutionState *state = static_cast<S2EExecutionState *>(*it);
-        fringe.push_back(state);
+        
         uint64_t staticTargets[1];
         state->getStaticTarget(&staticTargets[0]);
+
+        if(staticTargets[0] == m_address){
+            state_group1.push_back(state);
+        }
+        else{
+            state_group2.push_back(state);
+        }
 
         if (debug) {
             getInfoStream(s2eCurrent) <<
                 "Adding state ID: " << state->getID() <<
-                " dest branch:" << hexval(staticTargets[0]) << "\n";
+                " dest branch:" << hexval(staticTargets[0]) << 
+                " target branch:" << hexval(m_address) << "\n";
         }
     }
 
     foreach2 (it, removedStates.begin(), removedStates.end()) {
         S2EExecutionState *state = static_cast<S2EExecutionState *>(*it);
         bool ok = false;
+        
 
-        for (std::vector<S2EExecutionState *>::iterator it = fringe.begin(), ie = fringe.end(); it != ie; ++it) {
+        for (std::vector<S2EExecutionState *>::iterator it = state_group1.begin(), ie = state_group1.end(); it != ie; ++it) {
             if (state == *it) {
-                fringe.erase(it);
+                state_group1.erase(it);
+                ok = true;
+                break;
+            }
+        }
+        
+        for (std::vector<S2EExecutionState *>::iterator it = state_group2.begin(), ie = state_group2.end(); it != ie; ++it) {
+            if (state == *it) {
+                state_group2.erase(it);
                 ok = true;
                 break;
             }
@@ -111,7 +141,7 @@ void CustomSearcher::update(klee::ExecutionState *current, const klee::StateSet 
 }
 
 bool CustomSearcher::empty() {
-    return fringe.empty();
+    return state_group2.empty();
 }
 
 } // namespace plugins
