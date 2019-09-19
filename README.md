@@ -9,3 +9,8 @@ add the plugin paths in
 `s2e/source/s2e/libs2eplugins/src/CMakeLists.txt` 
 
 and recompile s2e (using s2e-env: `s2e build --rebuild-components libs2e`).
+
+
+# Binary Ninja_plugins
+
+Backward Analysis plugin
