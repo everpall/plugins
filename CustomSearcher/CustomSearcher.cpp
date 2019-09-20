@@ -24,6 +24,9 @@
 #include <s2e/S2E.h>
 #include <s2e/S2EExecutor.h>
 #include <s2e/Utils.h>
+#include <s2e/Plugins/OSMonitors/OSMonitor.h>
+#include <s2e/Plugins/OSMonitors/Support/ModuleMap.h>
+#include <s2e/Plugins/OSMonitors/ModuleDescriptor.h>
 
 #include <iostream>
 
@@ -34,13 +37,62 @@ namespace plugins {
 
 using namespace llvm;
 
-S2E_DEFINE_PLUGIN(CustomSearcher, "Custom searcher", "CustomSearcher");
+S2E_DEFINE_PLUGIN(CustomSearcher, "Custom searcher", "CustomSearcher","OSMonitor","ModuleMap", "ModuleExecutionDetector");
 
 void CustomSearcher::initialize() {
+    m_detector = s2e()->getPlugin<ModuleExecutionDetector>();
+    s2e()->getCorePlugin()->onStateFork.connect(sigc::mem_fun(*this, &CustomSearcher::onFork));
     s2e()->getExecutor()->setSearcher(this);
-    m_address = (uint64_t) s2e()->getConfig()->getInt(getConfigKey() + ".addressToTrack");
-    debug = true;// s2e()->getConfig()->getBool(getConfigKey() + ".debug");
+    m_addresses = s2e()->getConfig()->getIntegerList(getConfigKey() + ".addressToTrack");
+    debug = true; // s2e()->getConfig()->getBool(getConfigKey() + ".debug");
+    initial_count = 0;
+
 }
+
+void CustomSearcher::onFork(S2EExecutionState *state, const std::vector<S2EExecutionState *> &newStates, const std::vector<klee::ref<klee::Expr>> &newConditions) {
+
+    /* Config file Test */
+    // getInfoStream(state) << "Config File Test .. " << m_addresses.size() << "\n";
+    // std::vector<uint64_t>::iterator iter=m_addresses.begin();
+    // for (iter = m_addresses.begin(); iter != m_addresses.end(); ++iter){
+    //     getInfoStream(state) << hexval(*iter) << "\n";
+    // }
+    
+    /* Update the fork count stats */
+    auto module = m_detector->getCurrentDescriptor(state);
+    getInfoStream(state) << "[sunghyun] Forking!" << "\n";
+    uint64_t curPc = 0;
+    int signal = 0;
+
+    foreach2 (it2, newStates.begin(), newStates.end()) {
+        if (module) {
+            getInfoStream(*it2) << "[sunghyun] Forked Module name : " << module->Name << "\n";
+            
+            uint64_t staticTargets[1];
+            uint64_t originalTargets[1];
+            state->getStaticTarget(&originalTargets[0]);
+            (*it2)->getStaticTarget(&staticTargets[0]);
+            curPc = module->ToNativeBase(staticTargets[0]);
+            getInfoStream(*it2) << "[sunghyun] Forked ToNativeBase : " << hexval(curPc) << "\n";
+
+            
+            if(originalTargets[0] != staticTargets[0]){
+                std::vector<uint64_t>::iterator iter=m_addresses.begin();
+                for (iter = m_addresses.begin(); iter != m_addresses.end(); ++iter){
+                    if(curPc == *iter){
+                        state_group1.push_back(*it2);
+                        signal = 1;
+                    }
+                }
+                if(signal == 0){
+                    state_group2.push_back(*it2);
+                    signal = 0;
+                }
+            }
+        }
+    } 
+}
+
 
 klee::ExecutionState &CustomSearcher::selectState() {
     S2EExecutionState* ris = NULL;
@@ -80,6 +132,8 @@ void CustomSearcher::update(klee::ExecutionState *current, const klee::StateSet 
 
     S2EExecutionState *s2eCurrent = static_cast<S2EExecutionState *>(current);
 
+    
+
     if (debug && (addedStates.size() > 0 || removedStates.size() > 0)) {
         getInfoStream(s2eCurrent) <<
           "Current state ID: " << s2eCurrent->getID() <<
@@ -90,22 +144,13 @@ void CustomSearcher::update(klee::ExecutionState *current, const klee::StateSet 
 
     foreach2 (it, addedStates.begin(), addedStates.end()) {
         S2EExecutionState *state = static_cast<S2EExecutionState *>(*it);
-        
-        uint64_t staticTargets[1];
-        state->getStaticTarget(&staticTargets[0]);
-
-        if(staticTargets[0] == m_address){
-            state_group1.push_back(state);
-        }
-        else{
+        if(initial_count == 0){
             state_group2.push_back(state);
+            initial_count++;
         }
-
         if (debug) {
             getInfoStream(s2eCurrent) <<
-                "Adding state ID: " << state->getID() <<
-                " dest branch:" << hexval(staticTargets[0]) << 
-                " target branch:" << hexval(m_address) << "\n";
+                "Adding state ID: " << state->getID() << "\n";
         }
     }
 
