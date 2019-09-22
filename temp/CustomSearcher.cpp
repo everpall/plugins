@@ -24,6 +24,7 @@
 #include <s2e/S2E.h>
 #include <s2e/S2EExecutor.h>
 #include <s2e/Utils.h>
+#include <s2e/Plugins/OSMonitors/OSMonitor.h>
 #include <s2e/Plugins/OSMonitors/Support/ModuleMap.h>
 #include <s2e/Plugins/OSMonitors/ModuleDescriptor.h>
 
@@ -36,14 +37,65 @@ namespace plugins {
 
 using namespace llvm;
 
-S2E_DEFINE_PLUGIN(CustomSearcher, "Custom searcher", "CustomSearcher","ModuleMap");
+S2E_DEFINE_PLUGIN(CustomSearcher, "Custom searcher", "CustomSearcher","OSMonitor","ModuleMap", "ModuleExecutionDetector");
 
 void CustomSearcher::initialize() {
-    m_modules = s2e()->getPlugin<ModuleMap>();
+    m_detector = s2e()->getPlugin<ModuleExecutionDetector>();
+    s2e()->getCorePlugin()->onStateFork.connect(sigc::mem_fun(*this, &CustomSearcher::onFork));
     s2e()->getExecutor()->setSearcher(this);
-    m_address = (uint64_t) s2e()->getConfig()->getInt(getConfigKey() + ".addressToTrack");
-    debug = true;// s2e()->getConfig()->getBool(getConfigKey() + ".debug");
+    m_addresses = s2e()->getConfig()->getIntegerList(getConfigKey() + ".addressToTrack");
+    debug = true; // s2e()->getConfig()->getBool(getConfigKey() + ".debug");
+    initial_count = 0;
+
 }
+
+void CustomSearcher::onFork(S2EExecutionState *state, const std::vector<S2EExecutionState *> &newStates, const std::vector<klee::ref<klee::Expr>> &newConditions) {
+
+    /* Config file Test */
+    // getInfoStream(state) << "Config File Test .. " << m_addresses.size() << "\n";
+    // std::vector<uint64_t>::iterator iter=m_addresses.begin();
+    // for (iter = m_addresses.begin(); iter != m_addresses.end(); ++iter){
+    //     getInfoStream(state) << hexval(*iter) << "\n";
+    // }
+    
+    /* Update the fork count stats */
+    auto module = m_detector->getCurrentDescriptor(state);
+    getInfoStream(state) << "[sunghyun] Forking!" << "\n";
+    uint64_t curPc = 0;
+    int signal = 0;
+
+    foreach2 (it2, newStates.begin(), newStates.end()) {
+        if (module) {
+            getInfoStream(*it2) << "[sunghyun] Forked Module name : " << module->Name << "\n";
+            
+            uint64_t staticTargets[1];
+            uint64_t originalTargets[1];
+            state->getStaticTarget(&originalTargets[0]);
+            (*it2)->getStaticTarget(&staticTargets[0]);
+            curPc = module->ToNativeBase(staticTargets[0]);
+            getInfoStream(*it2) << "[sunghyun] Forked ToNativeBase : " << hexval(curPc) << "\n";
+
+            
+            if(state->getID() != (*it2)->getID() && curPc < 0x7f0000000000){
+                std::vector<uint64_t>::iterator iter=m_addresses.begin();
+                for (iter = m_addresses.begin(); iter != m_addresses.end(); ++iter){
+                    if(curPc == *iter){
+                        state_group1.push_back(*it2);
+                        signal = 1;
+                    }
+                }
+                if(signal == 0){
+                    state_group2.push_back(*it2);
+                    signal = 0;
+                }
+            }
+            else{
+                s2e()->getExecutor()->terminateState(*it2, "[Terminate State] Strange Address..");
+            }
+        }
+    }
+}
+
 
 klee::ExecutionState &CustomSearcher::selectState() {
     S2EExecutionState* ris = NULL;
@@ -62,18 +114,18 @@ klee::ExecutionState &CustomSearcher::selectState() {
             "Selecting state ID: " << ris->getID() <<
             " GID: " << ris->getGuid() <<
             " IP: " << ip << "\n";
-        //for(int i=0 ; i<state_group1.size(); i++){
-            //S2EExecutionState* tmp_ris =state_group1.at(i); 
-            //getInfoStream(tmp_ris) <<
-            //"[Ready - state_group1] state ID : " <<tmp_ris->getID()  <<
-            //" at pc = " << hexval(tmp_ris->regs()->getPc()) <<  "\n";
-        //}
-        //for(int i=0 ; i<state_group2.size(); i++){
-            //S2EExecutionState* tmp_ris =state_group2.at(i); 
-            //getInfoStream(tmp_ris) <<
-            //"[Ready - state_group2] state ID : " <<tmp_ris->getID()  <<
-            //" at pc = " << hexval(tmp_ris->regs()->getPc()) <<  "\n";
-        //}
+        for(int i=0 ; i<state_group1.size(); i++){
+            S2EExecutionState* tmp_ris =state_group1.at(i); 
+            getInfoStream(tmp_ris) <<
+            "[Ready - state_group1] state ID : " <<tmp_ris->getID()  <<
+            " at pc = " << hexval(tmp_ris->regs()->getPc()) <<  "\n";
+        }
+        for(int i=0 ; i<state_group2.size(); i++){
+            S2EExecutionState* tmp_ris =state_group2.at(i); 
+            getInfoStream(tmp_ris) <<
+            "[Ready - state_group2] state ID : " <<tmp_ris->getID()  <<
+            " at pc = " << hexval(tmp_ris->regs()->getPc()) <<  "\n";
+        }
     }
     return *ris;
 }
@@ -82,6 +134,8 @@ void CustomSearcher::update(klee::ExecutionState *current, const klee::StateSet 
                                  const klee::StateSet &removedStates) {
 
     S2EExecutionState *s2eCurrent = static_cast<S2EExecutionState *>(current);
+
+    
 
     if (debug && (addedStates.size() > 0 || removedStates.size() > 0)) {
         getInfoStream(s2eCurrent) <<
@@ -93,38 +147,14 @@ void CustomSearcher::update(klee::ExecutionState *current, const klee::StateSet 
 
     foreach2 (it, addedStates.begin(), addedStates.end()) {
         S2EExecutionState *state = static_cast<S2EExecutionState *>(*it);
-        
-        uint64_t staticTargets[1];
-        state->getStaticTarget(&staticTargets[0]);
-        getInfoStream(s2eCurrent) << "m_moduels : " << typeid(m_modules).name() << "\n";
-
-        //error!
-        ModuleDescriptorConstPtr module = m_modules->getModule(state);
-
-        getInfoStream(s2eCurrent) << "m_moduels : " << typeid(module).name() << "\n";
-        getInfoStream(s2eCurrent) << "test_hello" << "\n";
-        uint64_t nativebase = module->ToNativeBase(staticTargets[0]);
-        getInfoStream(s2eCurrent) << "test_1" << "\n";
-
-        if(staticTargets[0] == m_address){
-            state_group1.push_back(state);
-        }
-        else{
+        if(initial_count == 0){
             state_group2.push_back(state);
+            initial_count++;
         }
-        getInfoStream(s2eCurrent) << "test_2" << "\n";
-
         if (debug) {
             getInfoStream(s2eCurrent) <<
-                "Adding state ID: " << state->getID() <<
-                "Adding state Module Name : " << module->Name <<
-                "Adding state Module LoadBase : " << hexval(module->LoadBase) <<
-                "Adding state Module NativeBase : " << hexval(nativebase) << "\n" <<               
-                " dest branch:" << hexval(staticTargets[0]) << 
-                " target branch:" << hexval(m_address) << "\n";
+                "Adding state ID: " << state->getID() << "\n";
         }
-        getInfoStream(s2eCurrent) << "test_3" << "\n";
-
     }
 
     foreach2 (it, removedStates.begin(), removedStates.end()) {
