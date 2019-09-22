@@ -75,8 +75,10 @@ void CustomSearcher::onFork(S2EExecutionState *state, const std::vector<S2EExecu
             curPc = module->ToNativeBase(staticTargets[0]);
             getInfoStream(*it2) << "[sunghyun] Forked ToNativeBase : " << hexval(curPc) << "\n";
 
-            
-            if(originalTargets[0] != staticTargets[0]){
+            if(curPc < 0x1c000000 || curPc > 0x1c000000 + 0x2a000 ){
+                s2e()->getExecutor()->terminateState(**it2, "[Terminate State] Strange Address..");
+            }
+            if(state->getID() != (*it2)->getID() ){
                 std::vector<uint64_t>::iterator iter=m_addresses.begin();
                 for (iter = m_addresses.begin(); iter != m_addresses.end(); ++iter){
                     if(curPc == *iter){
@@ -89,8 +91,9 @@ void CustomSearcher::onFork(S2EExecutionState *state, const std::vector<S2EExecu
                     signal = 0;
                 }
             }
+            
         }
-    } 
+    }
 }
 
 
