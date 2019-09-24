@@ -205,14 +205,12 @@ add_plugin("MemoryMap")
 -------------------------------------------------------------------------------
 -- MultiSearcher is a top-level searcher that allows switching between
 -- different sub-searchers.
-
 add_plugin("CustomSearcher")
 
 pluginsConfig.CustomSearcher = {
---The address we want to track
-    addressToTrack = {0x1c00df8c, 0x1c00d44d, 0x1c00df99, 0x1c00dfa6, 0x1c00dd8a}
+	--The address we want to track
+		    addressToTrack = {0x1c00df8c, 0x1c00d44d, 0x1c00df99, 0x1c00dfa6, 0x1c00dd8a}
 }
-
 
 
 -------------------------------------------------------------------------------
@@ -348,3 +346,35 @@ function onStateForkDecide(state)
    return true
 end
 -- ]]
+
+
+add_plugin("LuaInstructionAnnotation")
+pluginsConfig.LuaInstructionAnnotation = {
+    -- For each instruction to annotate, provide an entry in the "annotations" table
+    annotations = {
+        -- Defines an annotation called "success"
+        success = {
+            -- The name of the module that we are interested in
+            module_name = "impct9.flt",
+            -- The name of the Lua function to call when this annotation is triggered
+            name = "on_success",
+            -- The virtual address of an instruction in the module that will trigger the annotation
+            pc = 0x1c00d35a,
+        },
+
+    }
+}
+
+function on_success(state, annotation_state)
+    -- Do something in the success state
+    g_s2e:debug("[Annotation] 0x1c00d35a !")
+
+    -- No need to continue running S2E - terminate
+    -- state:kill(1, "Success Kill Test..")
+end
+
+function on_failure(state, annotation_state)
+    -- There is no reason to continue execution any further. So kill the state
+    g_s2e:debug("[Annotation] 0x1c00d30a !")
+    state:kill(1, "Failure Invalid path")
+end
