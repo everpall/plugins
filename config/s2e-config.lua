@@ -147,7 +147,7 @@ add_plugin("ModuleExecutionDetector")
 pluginsConfig.ModuleExecutionDetector = {
 
     mod_0 = {
-        moduleName = "impct9.flt",
+        moduleName = "zmpct1.flt",
     },
 
     logLevel="info"
@@ -205,12 +205,49 @@ add_plugin("MemoryMap")
 -------------------------------------------------------------------------------
 -- MultiSearcher is a top-level searcher that allows switching between
 -- different sub-searchers.
-add_plugin("CustomSearcher")
+add_plugin("MultiSearcher")
 
-pluginsConfig.CustomSearcher = {
-	--The address we want to track
-		    addressToTrack = {0x1c00df8c, 0x1c00d44d, 0x1c00df99, 0x1c00dfa6, 0x1c00dd8a}
+-- CUPA stands for Class-Uniform Path Analysis. It is a searcher that groups
+-- states into classes. Each time the searcher needs to pick a state, it first
+-- chooses a class, then picks a state in that class. Classes can further be
+-- subdivided into subclasses.
+--
+-- The advantage of CUPA over other searchers is that it gives similar weights
+-- to different parts of the program. If one part forks a lot, a random searcher
+-- would most likely pick a state from that hotspot, decreasing the probability
+-- of choosing another state that may have better chance of covering new code.
+-- CUPA avoids this problem by grouping similar states together.
+
+add_plugin("CUPASearcher")
+pluginsConfig.CUPASearcher = {
+    -- The order of classes is important, please refer to the plugin
+    -- source code and documentation for details on how CUPA works.
+    classes = {
+
+
+        -- This ensures that states run for a certain amount of time.
+        -- Otherwise too frequent state switching may decrease performance.
+        "batch",
+
+
+
+        -- A program under test may be composed of several binaries.
+        -- We want to give equal chance to all binaries, even if some of them
+        -- fork a lot more than others.
+        "pagedir",
+
+        -- Finally, group states by program counter at fork.
+        "pc",
+    },
+    logLevel="info",
+    enabled = true,
+
+    -- Delay (in seconds) before switching states (when used with the "batch" class).
+    -- A very large delay becomes similar to DFS (current state keeps running
+    -- until it is terminated).
+    batchTime = 5
 }
+
 
 
 -------------------------------------------------------------------------------
@@ -354,27 +391,148 @@ pluginsConfig.LuaInstructionAnnotation = {
     annotations = {
         -- Defines an annotation called "success"
         success = {
-            -- The name of the module that we are interested in
             module_name = "impct9.flt",
-            -- The name of the Lua function to call when this annotation is triggered
             name = "on_success",
-            -- The virtual address of an instruction in the module that will trigger the annotation
-            pc = 0x1c00d35a,
+            pc = 0x1C00DFA6
         },
+        success = {
+            module_name = "impct9.flt",
+            name = "on_success",
+            pc = 0x1C00DD8A
+        },
+        success = {
+            module_name = "impct9.flt",
+            name = "on_success",
+            pc = 0x1C00DDCC
+        },
+        success = {
+            module_name = "impct9.flt",
+            name = "on_success",
+            pc = 0x1C00DE11
+        },
+        success = {
+            module_name = "impct9.flt",
+            name = "on_success",
+            pc = 0x1C00DE56
+        },
+        success = {
+            module_name = "impct9.flt",
+            name = "on_success",
+            pc = 0x1c00de72
+        },
+
+        failure1 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1c00df23,
+        },
+        failure2 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1c00de60,
+        },
+        failure4 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00DDA7,
+        },
+        failure5 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00DDEC,
+        },
+        failure6 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00DE31,
+        },
+        failure7 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D790,
+        },
+        failure8 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D8E9,
+        },
+        failure9 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D930,
+        },
+        failure11 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00DA18,
+        },
+        failure12 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D538,
+        },
+        failure13 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D712,
+        },
+        failure14 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00DB00,
+        },
+        failure15 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D7DE,
+        },
+
+
+        failure16 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D706,
+        },
+        failure17 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D863,
+        },
+        failure18 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D851,
+        },
+        failure19 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D8DD,
+        },
+        failure20 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D924,
+        },
+        failure21 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00DD30,
+        },
+
 
     }
 }
 
 function on_success(state, annotation_state)
     -- Do something in the success state
-    g_s2e:debug("[Annotation] 0x1c00d35a !")
+    g_s2e:debug("[Annotation] check point !")
 
     -- No need to continue running S2E - terminate
-    -- state:kill(1, "Success Kill Test..")
+    state:kill(1, "Success Kill Test..")
 end
 
 function on_failure(state, annotation_state)
     -- There is no reason to continue execution any further. So kill the state
-    g_s2e:debug("[Annotation] 0x1c00d30a !")
+    g_s2e:debug("[Annotation] Pruning !")
     state:kill(1, "Failure Invalid path")
 end
