@@ -431,6 +431,11 @@ pluginsConfig.LuaInstructionAnnotation = {
             name = "on_failure",
             pc = 0x1c00de60,
         },
+        failure3 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00E060,
+        },
         failure4 = {
             module_name = "impct9.flt",
             name = "on_failure",
@@ -460,6 +465,11 @@ pluginsConfig.LuaInstructionAnnotation = {
             module_name = "impct9.flt",
             name = "on_failure",
             pc = 0x1C00D930,
+        },
+        failure10 = {
+            module_name = "impct9.flt",
+            name = "on_failure",
+            pc = 0x1C00D5D8,
         },
         failure11 = {
             module_name = "impct9.flt",
